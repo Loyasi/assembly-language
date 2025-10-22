@@ -1,0 +1,108 @@
+; 程序功能：计算(A + B*20 - 30)/C + D，并以十进制输出结果
+; 其中A、B、C、D为带符号整数变量
+
+.MODEL SMALL
+.STACK 100H
+.DATA
+    ; 定义四个带符号自变量，可根据需要修改值
+    A   DW  10      ; 带符号变量A
+    B   DW  5       ; 带符号变量B
+    C   DW  4       ; 带符号变量C（注意不能为0）
+    D   DW  3       ; 带符号变量D
+    
+    ; 用于输出的常量和缓冲区
+    MSG_RESULT DB 'Result: $'
+    BUFFER     DB 6 DUP(?) ; 用于存储十进制数字的缓冲区
+    MINUS      DB '-'      ; 负号
+
+.CODE
+MAIN PROC
+    MOV AX, @DATA   ; 初始化数据段
+    MOV DS, AX
+    
+    ; 显示提示信息
+    MOV AH, 09H
+    LEA DX, MSG_RESULT
+    INT 21H
+    
+    ; 计算 B * 20
+    MOV AX, B       ; AX = B
+    MOV BX, 20      ; BX = 20
+    IMUL BX         ; AX = B * 20 (带符号乘法)
+    
+    ; 计算 A + (B * 20)
+    ADD AX, A       ; AX = A + B*20
+    
+    ; 计算 A + B*20 - 30
+    SUB AX, 30      ; AX = A + B*20 - 30
+    
+    ; 计算 (A + B*20 - 30) / C
+    MOV BX, C       ; BX = C
+    IDIV BX         ; AX = (A + B*20 - 30) / C (带符号除法)
+    
+    ; 计算最终结果: (A + B*20 - 30)/C + D
+    ADD AX, D       ; AX = 最终结果
+    
+    ; 输出结果
+    CALL PRINT_SIGNED_DECIMAL
+    
+    ; 程序结束
+    MOV AH, 4CH
+    INT 21H
+MAIN ENDP
+
+; 子程序：打印带符号十进制数（输入：AX=要打印的数）
+PRINT_SIGNED_DECIMAL PROC
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    PUSH SI
+    
+    ; 检查是否为负数
+    CMP AX, 0
+    JGE POSITIVE    ; 如果是非负数，直接处理
+    
+    ; 是负数，先输出负号
+    MOV AH, 02H
+    MOV DL, MINUS
+    INT 21H
+    
+    ; 取绝对值
+    NEG AX          ; AX = -AX
+
+POSITIVE:
+    MOV SI, OFFSET BUFFER + 5  ; 指向缓冲区末尾
+    MOV BX, 10                 ; 除数为10
+    MOV CX, 0                  ; 计数：记录数字位数
+    
+; 将数字按位分解并存储到缓冲区（逆序）
+DIVIDE_LOOP:
+    MOV DX, 0                  ; 扩展AX到DX:AX
+    IDIV BX                    ; 除以10，商在AX，余数在DX
+    
+    ADD DL, '0'                ; 将余数转换为ASCII码
+    MOV [SI], DL               ; 存储到缓冲区
+    DEC SI                     ; 移动到前一个位置
+    INC CX                     ; 位数加1
+    
+    CMP AX, 0                  ; 如果商不为0，继续分解
+    JNE DIVIDE_LOOP
+    
+; 从缓冲区输出数字（正序）
+PRINT_LOOP:
+    INC SI                     ; 移动到下一个位置
+    MOV AH, 02H
+    MOV DL, [SI]               ; 取出数字
+    INT 21H                    ; 输出
+    LOOP PRINT_LOOP
+    
+    POP SI
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+PRINT_SIGNED_DECIMAL ENDP
+
+END MAIN
